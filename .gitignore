@@ -54,6 +54,11 @@ Thumbs.db
 **/temp_*
 **/*_temp.*
 
-# Keep CSV results and PNG dashboards
-!*.csv
+# Exclude large simulation result files
+capitalist_simulation_results/*.csv
+debt_simulation_results/*.csv
+
+# Keep smaller result files and PNG dashboards
+!simple_simulation_results_*.csv
+!enhanced_simulation_results_*.csv
 !*.png 
