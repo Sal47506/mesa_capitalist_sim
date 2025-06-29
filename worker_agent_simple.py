@@ -14,6 +14,7 @@ class SimpleWorkerAgent(Agent):
         
         # Basic worker attributes
         self.work_hours = work_hours
+        self.worked_overtime = 0
         self.wage = 0  # Current wage per hour
         self.is_employed = False
         self.employer = None
@@ -61,7 +62,7 @@ class SimpleWorkerAgent(Agent):
         elif self.skill_level == "medium":
             return random.uniform(1500, 8000)   # Medium-skill modest savings
         else:
-            return random.uniform(-500, 2000)   # Low-skill may start in debt
+            return random.uniform(0, 2000)   # Low-skill may start with nothing
     
     def _get_productivity(self):
         """Get productivity multiplier based on skill level."""
@@ -116,6 +117,7 @@ class SimpleWorkerAgent(Agent):
             return random.uniform(0.12, 0.20)  # 12-20% for medium earners
         else:
             return random.uniform(0.05, 0.12)  # 5-12% for low earners
+            
     
     def get_reservation_wage(self):
         """Get minimum wage this worker will accept based on skill level and desperation."""

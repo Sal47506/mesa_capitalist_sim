@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 class SimpleCapitalistModel(Model):
     """Enhanced capitalist economy model with skill-based workers and firm ownership."""
     
-    def __init__(self, num_workers, num_firms):
+    def __init__(self, num_workers, num_firms, num_owners):
         # Properly initialize Mesa Model
         super().__init__()
         
         self.num_workers = num_workers
         self.num_firms = num_firms
+        self.num_owners = num_owners
         self.price_index = 1.0  # Inflation tracking
         self.inflation_rate = 0.02  # 2% annual inflation
         
@@ -170,30 +171,12 @@ class SimpleCapitalistModel(Model):
     
     def compute_gini(self):
         """Compute Gini coefficient for wealth inequality."""
-        workers = self.get_workers()
-        if not workers:
-            return 0
-        
-        # Use only worker wealth for Gini calculation
-        wealth_values = [w.wealth for w in workers]
-        wealth_values.sort()
-        
-        n = len(wealth_values)
-        if n == 0:
-            return 0
-        
-        # Calculate Gini coefficient
-        cumsum = 0
-        for i, wealth in enumerate(wealth_values):
-            cumsum += wealth * (2 * i + 1 - n)
-        
-        total_wealth = sum(wealth_values)
-        if total_wealth <= 0:
-            return 0
-        
-        gini = cumsum / (n * total_wealth)
-        return abs(gini)  # Ensure positive value
-    
+        workers_wealth = [worker.wealth for worker in self.worker_agents]
+        x = sorted(workers_wealth)        
+        n = len(x)
+        B = sum(xi * (n - i) for i, xi in enumerate(x)) / (n * sum(x))
+        return 1 + (1 / n) - 2 * B
+
     def get_unemployment_stats(self):
         """Get detailed unemployment statistics."""
         total_workers = len(self.get_workers())

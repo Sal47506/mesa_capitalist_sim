@@ -11,9 +11,7 @@ class SimpleFirmAgent(Agent):
     """A firm agent that hires workers and extracts surplus value, with skill-based hiring."""
     
     def __init__(self, unique_id, model):
-        # Initialize Mesa Agent without calling super().__init__() with parameters
-        self.unique_id = unique_id
-        self.model = model
+        super().__init__(unique_id, model)
         
         # Firm characteristics
         self.capital = random.uniform(50000, 200000)  # Starting capital
@@ -51,20 +49,10 @@ class SimpleFirmAgent(Agent):
         self.demand_multiplier = random.uniform(0.9, 1.1)
         
         # Hiring parameters
-        self.hiring_aggressiveness = random.uniform(0.7, 0.9)
+        self.hiring_aggressiveness = random.uniform(0.4, 0.6)
         self.firing_threshold = random.uniform(0.1, 0.2)
         
-    def _determine_skill_preferences(self):
-        """Determine what skill mix this firm prefers."""
-        firm_type = random.choice(["tech", "manufacturing", "service"])
-        
-        if firm_type == "tech":
-            return {"high": 0.4, "medium": 0.4, "low": 0.2}  # Tech firms want skilled workers
-        elif firm_type == "manufacturing":
-            return {"high": 0.1, "medium": 0.5, "low": 0.4}  # Manufacturing wants medium/low skill
-        else:  # service
-            return {"high": 0.2, "medium": 0.3, "low": 0.5}  # Service mostly low skill
-    
+
     def get_current_skill_mix(self):
         """Get current distribution of worker skills."""
         if not self.workers:
@@ -76,30 +64,42 @@ class SimpleFirmAgent(Agent):
         
         total = len(self.workers)
         return {skill: count/total for skill, count in skill_counts.items()}
+
+    def _determine_skill_preferences(self):
+        """Determine what skill mix this firm prefers."""
+        return random.choice(["low_skill", "medium_skill", "high_skill"])
     
     def should_hire_worker(self, worker):
         """Determine if firm should hire this worker based on skill needs."""
-        if len(self.workers) >= self.max_workers:
-            return False
-        
-        # Check if we need this skill level
-        current_mix = self.get_current_skill_mix()
-        preferred_count = self.preferred_skill_mix[worker.skill_level]
-        current_count = current_mix[worker.skill_level]
-        
-        # More likely to hire if we're below preferred skill mix
-        if current_count < preferred_count:
-            hire_probability = 0.8  # High chance if we need this skill
-        else:
-            hire_probability = 0.3  # Lower chance if we have enough
-        
-        # Adjust for firm profitability
-        if self.profit > 0:
-            hire_probability *= 1.5  # More likely to hire if profitable
-        elif self.profit < -1000:
-            hire_probability *= 0.3  # Less likely if losing money
-        
-        return random.random() < hire_probability
+        if worker not in self.workers:
+            if len(self.workers) >= self.max_workers:
+                return False
+            
+            if(self.preferred_skill_mix != worker.skill_level):
+                return False
+            # Check if we need this skill level
+            current_mix = self.get_current_skill_mix()
+            preferred_count = self.preferred_skill_mix[worker.skill_level]
+            current_count = current_mix[worker.skill_level]
+            
+            # More likely to hire if we're below preferred skill mix
+            if current_count < preferred_count:
+                hire_probability = 0.8  # High chance if we need this skill
+            else:
+                hire_probability = 0.3  # Lower chance if we have enough
+            
+            # Adjust for firm profitability
+            if self.profit > 0:
+                hire_probability *= 1.5  # More likely to hire if profitable
+            elif self.profit < -1000:
+                hire_probability *= 0.3  # Less likely if losing money
+            hire = random.random() < hire_probability
+            if(hire):
+                self.hire_worker(worker, self.calculate_worker_wage_offer(worker))
+                return True
+            else:
+                return False
+        return False
     
     def calculate_worker_wage_offer(self, worker):
         """Calculate wage offer based on worker skill level and firm needs."""
@@ -158,7 +158,7 @@ class SimpleFirmAgent(Agent):
         # Firing decision (less aggressive than before)
         if self.profit < -500 and len(self.workers) > 5:
             # Fire workers if losing money, but less aggressively
-            fire_probability = 0.15  # 15% chance to fire someone
+            fire_probability = 0.45  # 45% chance to fire someone
             if random.random() < fire_probability:
                 worker_to_fire = random.choice(self.workers)
                 self.fire_worker(worker_to_fire)
@@ -182,16 +182,11 @@ class SimpleFirmAgent(Agent):
     
     def hire_worker(self, worker, hourly_wage):
         """Hire a worker at the specified hourly wage."""
-        if worker not in self.workers and len(self.workers) < self.max_workers:
-            self.workers.append(worker)
-            worker.work_for_firm(self, hourly_wage)
-            
             # Update model employment tracking
-            if worker in self.model.unemployed_workers:
-                self.model.unemployed_workers.remove(worker)
-            if worker not in self.model.employed_workers:
-                self.model.employed_workers.append(worker)
-            
+        if worker in self.model.unemployed_workers:
+            self.model.unemployed_workers.remove(worker)
+        if worker not in self.model.employed_workers:
+            self.model.employed_workers.append(worker)
             return True
         return False
     
