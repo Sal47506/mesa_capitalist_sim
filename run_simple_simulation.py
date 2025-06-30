@@ -12,8 +12,31 @@ import pandas as pd
 import numpy as np
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from mesa import Model
-from mesa.datacollection import DataCollector
+# Simple replacements for Mesa classes
+class Model:
+    def __init__(self):
+        pass
+
+class DataCollector:
+    def __init__(self, model_reporters=None):
+        self.model_reporters = model_reporters or {}
+        self.model_vars = []
+    
+    def collect(self, model):
+        data = {}
+        for name, func in self.model_reporters.items():
+            try:
+                if callable(func):
+                    data[name] = func(model)
+                else:
+                    data[name] = getattr(model, func)
+            except:
+                data[name] = 0
+        self.model_vars.append(data)
+    
+    def get_model_vars_dataframe(self):
+        import pandas as pd
+        return pd.DataFrame(self.model_vars)
 import random
 
 # Import our enhanced agents
@@ -26,7 +49,7 @@ logger = logging.getLogger(__name__)
 class SimpleCapitalistModel(Model):
     """Enhanced capitalist economy model with skill-based workers and firm ownership."""
     
-    def __init__(self, num_workers, num_firms, num_owners):
+    def __init__(self, num_workers, num_firms, num_owners=0):
         # Properly initialize Mesa Model
         super().__init__()
         
@@ -75,6 +98,7 @@ class SimpleCapitalistModel(Model):
                 "Workers in Debt": lambda m: sum(1 for w in m.get_workers() if w.debt > 0),
                 "Debt to Income Ratio": lambda m: m.get_avg_debt_to_income(),
                 "Bankrupt Workers": lambda m: sum(1 for w in m.get_workers() if w.is_bankrupt),
+                "Total Debt Payments": lambda m: sum(max(w.debt * 0.02, 20) if w.debt > 0 else 0 for w in m.get_workers()),
                 # INEQUALITY & UNEMPLOYMENT METRICS
                 "Gini Coefficient": lambda m: m.compute_gini(),
                 "Long-term Unemployed": lambda m: sum(1 for w in m.unemployed_workers if w.weeks_unemployed > 12),
@@ -85,7 +109,23 @@ class SimpleCapitalistModel(Model):
                 "High Skill Workers": lambda m: sum(1 for w in m.get_workers() if w.skill_level == "high"),
                 "Medium Skill Workers": lambda m: sum(1 for w in m.get_workers() if w.skill_level == "medium"),
                 "Low Skill Workers": lambda m: sum(1 for w in m.get_workers() if w.skill_level == "low"),
-                "Firm Owners": lambda m: sum(1 for w in m.get_workers() if w.owns_firm)
+                "Firm Owners": lambda m: sum(1 for w in m.get_workers() if w.owns_firm),
+                # DETAILED SKILL-BASED INCOME METRICS
+                "High Skill Average Wage": lambda m: sum(w.wage for w in m.get_workers() if w.skill_level == "high" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "high" and w.is_employed)),
+                "Medium Skill Average Wage": lambda m: sum(w.wage for w in m.get_workers() if w.skill_level == "medium" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "medium" and w.is_employed)),
+                "Low Skill Average Wage": lambda m: sum(w.wage for w in m.get_workers() if w.skill_level == "low" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "low" and w.is_employed)),
+                # REAL WAGES (INFLATION ADJUSTED)
+                "Real Wage Total": lambda m: sum(w.wage for w in m.get_workers()) / m.price_index,
+                "High Skill Real Wage": lambda m: (sum(w.wage for w in m.get_workers() if w.skill_level == "high" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "high" and w.is_employed))) / m.price_index,
+                "Medium Skill Real Wage": lambda m: (sum(w.wage for w in m.get_workers() if w.skill_level == "medium" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "medium" and w.is_employed))) / m.price_index,
+                "Low Skill Real Wage": lambda m: (sum(w.wage for w in m.get_workers() if w.skill_level == "low" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "low" and w.is_employed))) / m.price_index,
+                # INFLATION RATE
+                "Weekly Inflation Rate": lambda m: ((m.price_index / 1.0) ** (1/52) - 1) if hasattr(m, 'price_index') else 0,
+                "Annual Inflation Rate": lambda m: (m.price_index - 1.0) if hasattr(m, 'price_index') else 0,
+                # EXPLOITATION BY SKILL LEVEL
+                "High Skill Exploitation": lambda m: sum(w.get_exploitation_rate() for w in m.get_workers() if w.skill_level == "high" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "high" and w.is_employed)),
+                "Medium Skill Exploitation": lambda m: sum(w.get_exploitation_rate() for w in m.get_workers() if w.skill_level == "medium" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "medium" and w.is_employed)),
+                "Low Skill Exploitation": lambda m: sum(w.get_exploitation_rate() for w in m.get_workers() if w.skill_level == "low" and w.is_employed) / max(1, sum(1 for w in m.get_workers() if w.skill_level == "low" and w.is_employed))
             }
         )
         
@@ -209,7 +249,7 @@ def main():
     # ============================================================
     num_workers = 1500  # Number of workers in the economy
     num_firms = 30      # Number of firms
-    num_steps = 104     # Simulation length in weeks (104 weeks = 2 years)
+    num_steps = 260     # Simulation length in weeks (260 weeks = 5 years)
     
     print(f"Workers: {num_workers:,}")
     print(f"Firms: {num_firms}")

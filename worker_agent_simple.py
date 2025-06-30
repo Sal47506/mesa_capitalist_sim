@@ -1,13 +1,24 @@
 import random
-from mesa import Agent
+# Simple replacement for Mesa Agent
+class Agent:
+    def __init__(self, unique_id, model):
+        self.unique_id = unique_id
+        self.model = model
+
+USE_MESA = False
 
 class SimpleWorkerAgent(Agent):
     """Enhanced worker agent with skill levels, firm ownership, and debt mechanics."""
     
     def __init__(self, unique_id, model, work_hours=40):
-        # Initialize Mesa Agent without calling super().__init__() with parameters
-        self.unique_id = unique_id
-        self.model = model
+        if USE_MESA:
+            super().__init__(unique_id, model)
+        else:
+            self.unique_id = unique_id
+            self.model = model
+        
+        # Set work hours first  
+        self.work_hours = work_hours
         
         # Skill level affects wages and wealth accumulation
         self.skill_level = self._determine_skill_level()

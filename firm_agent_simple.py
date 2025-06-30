@@ -3,7 +3,14 @@ Simple Firm Agent for Capitalist Economy Simulation
 Enhanced to pay different wages based on worker skill levels.
 """
 
-from mesa import Agent
+# Simple replacement for Mesa Agent
+class Agent:
+    def __init__(self, unique_id, model):
+        self.unique_id = unique_id
+        self.model = model
+
+USE_MESA = False
+
 import random
 import numpy as np
 
@@ -11,7 +18,11 @@ class SimpleFirmAgent(Agent):
     """A firm agent that hires workers and extracts surplus value, with skill-based hiring."""
     
     def __init__(self, unique_id, model):
-        super().__init__(unique_id, model)
+        if USE_MESA:
+            super().__init__(unique_id, model)
+        else:
+            self.unique_id = unique_id
+            self.model = model
         
         # Firm characteristics
         self.capital = random.uniform(50000, 200000)  # Starting capital
@@ -67,7 +78,14 @@ class SimpleFirmAgent(Agent):
 
     def _determine_skill_preferences(self):
         """Determine what skill mix this firm prefers."""
-        return random.choice(["low_skill", "medium_skill", "high_skill"])
+        preferences = {
+            "high": random.uniform(0.1, 0.3),
+            "medium": random.uniform(0.2, 0.4), 
+            "low": random.uniform(0.4, 0.7)
+        }
+        # Normalize to sum to 1
+        total = sum(preferences.values())
+        return {skill: count/total for skill, count in preferences.items()}
     
     def should_hire_worker(self, worker):
         """Determine if firm should hire this worker based on skill needs."""
@@ -75,8 +93,6 @@ class SimpleFirmAgent(Agent):
             if len(self.workers) >= self.max_workers:
                 return False
             
-            if(self.preferred_skill_mix != worker.skill_level):
-                return False
             # Check if we need this skill level
             current_mix = self.get_current_skill_mix()
             preferred_count = self.preferred_skill_mix[worker.skill_level]
@@ -182,13 +198,16 @@ class SimpleFirmAgent(Agent):
     
     def hire_worker(self, worker, hourly_wage):
         """Hire a worker at the specified hourly wage."""
-            # Update model employment tracking
+        # Add worker to firm's worker list
+        self.workers.append(worker)
+        worker.work_for_firm(self, hourly_wage)
+        
+        # Update model employment tracking
         if worker in self.model.unemployed_workers:
             self.model.unemployed_workers.remove(worker)
         if worker not in self.model.employed_workers:
             self.model.employed_workers.append(worker)
-            return True
-        return False
+        return True
     
     def fire_worker(self, worker):
         """Fire a worker."""
